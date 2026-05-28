@@ -56,8 +56,16 @@ html,body{width:100%;height:100%;overflow:hidden}
 
 .panel span{color:var(--clr);line-height:1;transition:font-size 0.4s;position:relative;z-index:2}
 .panel.flip span{animation:fd 0.32s cubic-bezier(.4,0,.2,1)}
+.panel.flip{animation:panelGlow 0.5s ease-out}
 .panel.alert{border-color:#ff4040 !important;box-shadow:0 0 22px rgba(255,50,50,0.35) !important}
 .panel.alert span{color:#ff6060}
+@keyframes panelGlow{
+  0%  {box-shadow:0 6px 24px rgba(0,0,0,0.4),0 0 26px var(--glow),inset 0 1px 0 rgba(255,255,255,0.06)}
+  100%{box-shadow:0 6px 24px rgba(0,0,0,0.4),inset 0 1px 0 rgba(255,255,255,0.04)}
+}
+/* ── TAB FADE TRANSITION ── */
+.tab-pane{animation:tabFade 0.3s ease}
+@keyframes tabFade{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
 
 @keyframes fd{
   0%  {transform:perspective(500px) rotateX(-88deg) scale(0.95);opacity:0}
@@ -124,9 +132,45 @@ html,body{width:100%;height:100%;overflow:hidden}
 .tsep{color:var(--sep);padding-bottom:20px;font-size:30px}
 
 /* ── TIMER PROGRESS BAR ── */
-.progress-bar-wrap{width:460px;max-width:90vw;margin-top:1.6rem}
-.progress-bar-track{width:100%;height:5px;background:var(--sep);border-radius:99px;overflow:hidden}
-.progress-bar-fill{height:100%;border-radius:99px;background:var(--acc);box-shadow:0 0 10px var(--glow);transition:width 1s linear,background 0.4s}
+.progress-bar-wrap{
+  position:fixed;bottom:0;left:0;right:0;
+  padding:0 20px 18px 20px;
+  z-index:50;
+}
+.progress-bar-track{
+  width:100%;height:14px;
+  background:var(--sep);
+  border-radius:99px;
+  position:relative;overflow:hidden;
+}
+.progress-bar-fill{
+  height:100%;
+  border-radius:99px;
+  background:linear-gradient(90deg, var(--acc) 0%, color-mix(in srgb, var(--acc) 60%, white) 100%);
+  box-shadow:0 0 18px var(--glow), 0 0 40px var(--glow);
+  transition:width 1s linear,background 0.4s,box-shadow 0.4s;
+  position:relative;
+}
+/* glowing leading edge */
+.progress-bar-fill::after{
+  content:'';
+  position:absolute;right:0;top:0;bottom:0;width:40px;
+  background:linear-gradient(90deg,transparent,rgba(255,255,255,0.5));
+  border-radius:0 99px 99px 0;
+}
+/* tick marks */
+.progress-bar-track::before{
+  content:'';
+  position:absolute;inset:0;
+  background:repeating-linear-gradient(
+    90deg,
+    transparent 0px,
+    transparent calc(10% - 1px),
+    rgba(0,0,0,0.25) calc(10% - 1px),
+    rgba(0,0,0,0.25) 10%
+  );
+  z-index:2;pointer-events:none;
+}
 
 /* ── LAPS ── */
 .laps-list{margin-top:1rem;width:100%;max-width:380px;max-height:110px;overflow-y:auto;scrollbar-width:thin;scrollbar-color:var(--sep) transparent}
@@ -225,7 +269,7 @@ html,body{width:100%;height:100%;overflow:hidden}
   <div class="date-lbl" id="dateLbl"></div>
 
   <!-- CLOCK -->
-  <div id="tab-clock">
+  <div id="tab-clock" class="tab-pane">
     <div class="clock-wrap">
       <div class="panel" id="h1"><span id="h1v">0</span></div>
       <div class="panel" id="h2"><span id="h2v">0</span></div>
@@ -240,7 +284,7 @@ html,body{width:100%;height:100%;overflow:hidden}
   </div>
 
   <!-- TIMER -->
-  <div id="tab-timer" style="display:none;text-align:center">
+  <div id="tab-timer" class="tab-pane" style="display:none;text-align:center">
     <div class="tinputs" id="tinputs">
       <div class="tgrp"><div class="tlbl">HRS</div><input class="tinp" id="t-h" type="number" min="0" max="99" value="0"></div>
       <div class="tsep">:</div>
@@ -270,7 +314,7 @@ html,body{width:100%;height:100%;overflow:hidden}
   </div>
 
   <!-- STOPWATCH -->
-  <div id="tab-sw" style="display:none;text-align:center">
+  <div id="tab-sw" class="tab-pane" style="display:none;text-align:center">
     <div class="clock-wrap">
       <div class="panel" id="sw-h1"><span id="sw-h1v">0</span></div>
       <div class="panel" id="sw-h2"><span id="sw-h2v">0</span></div>
@@ -340,8 +384,26 @@ let tsecs=0,timerTotal=0,trun=false,tiv=null;
 function progressSet(ratio,al){
   const fill=document.getElementById('progressFill');
   fill.style.width=(Math.max(0,Math.min(1,ratio))*100)+'%';
-  fill.style.background=al?'#ff4040':'var(--acc)';
-  fill.style.boxShadow=al?'0 0 12px rgba(255,60,60,0.6)':'0 0 10px var(--glow)';
+  if(al){
+    fill.style.background='linear-gradient(90deg,#cc2020,#ff5050)';
+    fill.style.boxShadow='0 0 28px rgba(255,50,50,0.9),0 0 60px rgba(255,50,50,0.4)';
+  } else {
+    // green(1.0) → yellow(0.5) → red(0.0)
+    let r,g;
+    if(ratio>0.5){
+      // green → yellow
+      const t=(1-ratio)*2;
+      r=Math.round(t*220);g=200;
+    } else {
+      // yellow → red
+      const t=ratio*2;
+      r=220;g=Math.round(t*200);
+    }
+    const col=`rgb(${r},${g},30)`;
+    const colLight=`rgb(${Math.min(255,r+40)},${Math.min(255,g+40)},60)`;
+    fill.style.background=`linear-gradient(90deg,${col},${colLight})`;
+    fill.style.boxShadow=`0 0 18px rgba(${r},${g},30,0.7),0 0 40px rgba(${r},${g},30,0.3)`;
+  }
 }
 
 function timerToggle(){
@@ -433,11 +495,21 @@ swDraw();
 let curTab='clock';
 function switchTab(t){
   curTab=t;
-  document.getElementById('tab-clock').style.display=t==='clock'?'block':'none';
-  document.getElementById('tab-timer').style.display=t==='timer'?'block':'none';
-  document.getElementById('tab-sw').style.display=t==='stopwatch'?'block':'none';
+  const tabs=['clock','timer','stopwatch'];
+  const ids=['tab-clock','tab-timer','tab-sw'];
+  ids.forEach((id,i)=>{
+    const el=document.getElementById(id);
+    if(tabs[i]===t){
+      el.style.display='block';
+      el.classList.remove('tab-pane');
+      void el.offsetWidth;
+      el.classList.add('tab-pane');
+    } else {
+      el.style.display='none';
+    }
+  });
   document.getElementById('dateLbl').style.display=t==='clock'?'block':'none';
-  document.querySelectorAll('.tab').forEach((el,i)=>el.classList.toggle('active',['clock','timer','stopwatch'][i]===t));
+  document.querySelectorAll('.tab').forEach((el,i)=>el.classList.toggle('active',tabs[i]===t));
 }
 
 // ── Fullscreen ──
